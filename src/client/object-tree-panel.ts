@@ -160,35 +160,33 @@ export class ObjectTreePanel {
         const handleDragOver = (e: DragEvent) => {
             const dt = e.dataTransfer;
             if (!dt) return;
-            const data = dt.getData('text/plain');
-            if (data && (data.startsWith('asset:') || data.startsWith('node:'))) {
-                e.preventDefault();
-                e.stopPropagation();
-                // Determine drop zone: before, into, after
-                this.clearAllDropIndicators();
-                const rect = (nodeElement as HTMLElement).getBoundingClientRect();
-                const y = e.clientY - rect.top;
-                const ratio = y / rect.height;
-                const el = nodeElement as HTMLElement;
-                if (ratio < 0.25) {
-                    el.classList.add('drop-before');
-                } else if (ratio > 0.75) {
-                    el.classList.add('drop-after');
-                } else {
-                    el.classList.add('drop-into');
-                }
+            // Some browsers don't expose getData during dragover; allow drop regardless
+            e.preventDefault();
+            e.stopPropagation();
+            // Determine drop zone: before, into, after
+            this.clearAllDropIndicators();
+            const rect = (nodeElement as HTMLElement).getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const ratio = y / rect.height;
+            const el = nodeElement as HTMLElement;
+            if (ratio < 0.25) {
+                el.classList.add('drop-before');
+            } else if (ratio > 0.75) {
+                el.classList.add('drop-after');
+            } else {
+                el.classList.add('drop-into');
+            }
 
-                // Auto-expand collapsed nodes after a short hover
-                this.lastDragOverNodeId = node.id;
-                if (hasChildren && this.collapsedNodes.has(node.id) && !this.hoverExpandTimers.has(node.id)) {
-                    const timerId = window.setTimeout(() => {
-                        this.hoverExpandTimers.delete(node.id);
-                        if (this.lastDragOverNodeId === node.id && this.collapsedNodes.has(node.id)) {
-                            this.toggleNode(node.id);
-                        }
-                    }, 500);
-                    this.hoverExpandTimers.set(node.id, timerId as unknown as number);
-                }
+            // Auto-expand collapsed nodes after a short hover
+            this.lastDragOverNodeId = node.id;
+            if (hasChildren && this.collapsedNodes.has(node.id) && !this.hoverExpandTimers.has(node.id)) {
+                const timerId = window.setTimeout(() => {
+                    this.hoverExpandTimers.delete(node.id);
+                    if (this.lastDragOverNodeId === node.id && this.collapsedNodes.has(node.id)) {
+                        this.toggleNode(node.id);
+                    }
+                }, 500);
+                this.hoverExpandTimers.set(node.id, timerId as unknown as number);
             }
         };
         const handleDragLeave = (e: DragEvent) => {
@@ -223,12 +221,34 @@ export class ObjectTreePanel {
                 const y = e.clientY - rect.top;
                 const ratio = y / rect.height;
                 let parent = node;
+                let insertedBeforeAfter = false;
+                let desiredIndex = -1;
                 if (ratio < 0.25 || ratio > 0.75) {
                     const p = node.getParent();
-                    if (p) parent = p;
+                    if (p) {
+                        parent = p;
+                        const siblings = parent.getChildren();
+                        const targetIndex = siblings.findIndex(c => c.id === node.id);
+                        desiredIndex = ratio < 0.25 ? targetIndex : targetIndex + 1;
+                        insertedBeforeAfter = true;
+                    }
                 }
                 const newNode = this.assetManager.instantiateAsset(assetId, parent);
                 if (newNode) {
+                    // If before/after, move new node to the desired index
+                    if (insertedBeforeAfter) {
+                        const currentParent = newNode.getParent();
+                        if (currentParent === parent) {
+                            const currentIndex = newNode.getIndexInParent();
+                            if (currentIndex >= 0) {
+                                // Adjust index if needed due to append-at-end behavior
+                                parent.removeChild(newNode);
+                                // Clamp desiredIndex to bounds
+                                const clamped = Math.max(0, Math.min(desiredIndex, parent.getChildren().length));
+                                parent.addChildAt(newNode, clamped);
+                            }
+                        }
+                    }
                     this.refresh();
                     this.expandPath(parent.id);
                     this.selectNode(newNode);

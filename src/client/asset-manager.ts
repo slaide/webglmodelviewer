@@ -3,6 +3,7 @@ import { SceneNode } from './scene-node';
 import { SceneObject } from './scene-object';
 import { Drawable } from './drawable';
 import { Mesh } from './geometry/mesh';
+import { ProjectManager } from './project-manager';
 import { vec3 } from 'gl-matrix';
 import { debugLog } from './debug-logger';
 import { parseOBJ, parseMTL } from './parsers/obj-mtl';
@@ -30,12 +31,16 @@ export class AssetManager {
   private container: HTMLElement;
   private gl: WebGL2RenderingContext;
 
-  constructor(private renderer: WebGLRenderer) {
+  constructor(private renderer: WebGLRenderer, private project?: ProjectManager) {
     this.gl = renderer.getGLContext();
     const container = document.getElementById('assets-content');
     if (!container) throw new Error('Assets container not found');
     this.container = container;
     this.setupDnD();
+  }
+
+  setProject(project: ProjectManager) {
+    this.project = project;
   }
 
   list(): Asset[] { return Array.from(this.assets.values()); }
@@ -83,6 +88,11 @@ export class AssetManager {
         const base = f.name.replace(/\.obj$/i, '');
         const mtl = byName.get((base + '.mtl').toLowerCase());
         try {
+          // Persist into project assets folder if available
+          if (this.project && this.project.hasProject()) {
+            await this.project.writeFileIn('assets', f.name, f);
+            if (mtl) await this.project.writeFileIn('assets', mtl.name, mtl);
+          }
           await this.importOBJ(f, mtl);
         } catch (err) {
           debugLog.error(`Failed to import ${f.name}: ${err}`);
@@ -108,6 +118,35 @@ export class AssetManager {
     this.assets.set(id, asset);
     this.renderAssetList();
     debugLog.info(`Imported asset: ${objFile.name}`);
+  }
+
+  // Load existing OBJ/MTL assets from the project assets directory
+  async loadFromProject(): Promise<void> {
+    if (!this.project || !this.project.hasProject()) return;
+    const files = await this.project.listFiles('assets');
+    const lower = new Map<string, string>();
+    for (const f of files) lower.set(f.name.toLowerCase(), f.name);
+    for (const f of files) {
+      if (f.name.toLowerCase().endsWith('.obj')) {
+        const base = f.name.replace(/\.obj$/i, '');
+        const mtlName = lower.get((base + '.mtl').toLowerCase());
+        const objText = await this.project.readTextFrom('assets', f.name) as string;
+        const mtlText = mtlName ? await this.project.readTextFrom('assets', mtlName) : null;
+        const mtl = mtlText ? parseMTL(mtlText) : {} as any;
+        const mesh = parseOBJ(objText, mtl);
+        const id = 'asset-' + Math.random().toString(36).slice(2);
+        this.assets.set(id, {
+          id,
+          name: f.name,
+          type: 'mesh',
+          positions: mesh.positions,
+          normals: mesh.normals,
+          material: mesh.material
+        });
+      }
+    }
+    this.renderAssetList();
+    debugLog.info('Loaded assets from project directory');
   }
 
   private renderAssetList() {
