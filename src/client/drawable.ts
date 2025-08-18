@@ -17,6 +17,7 @@ export interface BoundingBox {
 export interface Geometry {
     render(): void;
     renderWireframe?(): void;
+    getStats?(): { vertices: number; faces: number };
 }
 
 export class Drawable {

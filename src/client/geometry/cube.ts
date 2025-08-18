@@ -7,6 +7,7 @@ export class Cube {
     private wireframeIndexBuffer!: WebGLBuffer;
     private indexCount!: number;
     private wireframeIndexCount!: number;
+    private vertexCount!: number;
 
     constructor(private gl: WebGL2RenderingContext) {
         this.createGeometry();
@@ -51,6 +52,7 @@ export class Cube {
         ]);
 
         this.indexCount = indices.length;
+        this.vertexCount = vertices.length / 3;
         this.wireframeIndexCount = wireframeIndices.length;
 
         // Create shared buffers
@@ -107,5 +109,12 @@ export class Cube {
         this.gl.bindVertexArray(this.wireframeVao);
         this.gl.drawElements(this.gl.LINES, this.wireframeIndexCount, this.gl.UNSIGNED_SHORT, 0);
         this.gl.bindVertexArray(null);
+    }
+
+    getStats() {
+        return {
+            vertices: this.vertexCount,
+            faces: Math.floor(this.indexCount / 3)
+        };
     }
 }

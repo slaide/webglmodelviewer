@@ -55,5 +55,11 @@ export class Mesh {
     this.gl.drawArrays(this.gl.TRIANGLES, 0, this.vertexCount);
     this.gl.bindVertexArray(null);
   }
-}
 
+  getStats() {
+    return {
+      vertices: this.vertexCount,
+      faces: Math.floor(this.vertexCount / 3)
+    };
+  }
+}

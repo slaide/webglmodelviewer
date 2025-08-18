@@ -366,11 +366,29 @@ export class ObjectEditor {
         if (node instanceof SceneObject) {
             debugLog.info('Updating material controls for SceneObject');
             this.updateMaterialControls(node);
+            // Update mesh info if available
+            const meshInfo = document.getElementById('mesh-info') as HTMLElement | null;
+            const vSpan = document.getElementById('mesh-vertices') as HTMLElement | null;
+            const fSpan = document.getElementById('mesh-faces') as HTMLElement | null;
+            const stats = node.geometry && (node.geometry as any).getStats ? (node.geometry as any).getStats() : null;
+            if (meshInfo) {
+                if (stats && typeof stats.vertices === 'number' && typeof stats.faces === 'number') {
+                    meshInfo.style.display = 'block';
+                    if (vSpan) vSpan.textContent = String(stats.vertices);
+                    if (fSpan) fSpan.textContent = String(stats.faces);
+                } else {
+                    meshInfo.style.display = 'none';
+                }
+            }
         } else if (node instanceof SceneLight) {
             debugLog.info('Updating light controls for SceneLight');
             this.updateLightControls(node);
+            const meshInfo = document.getElementById('mesh-info') as HTMLElement | null;
+            if (meshInfo) meshInfo.style.display = 'none';
         } else {
             debugLog.info('No additional controls for plain SceneNode');
+            const meshInfo = document.getElementById('mesh-info') as HTMLElement | null;
+            if (meshInfo) meshInfo.style.display = 'none';
         }
     }
 
