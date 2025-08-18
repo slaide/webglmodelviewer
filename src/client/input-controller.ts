@@ -56,11 +56,8 @@ export class InputController {
                     if (selected) {
                         debugLog.info(`Selected object: ${selected.name}`);
                     } else {
-                        debugLog.info('No object selected - requesting pointer lock');
-                        this.canvas.requestPointerLock();
+                        debugLog.info('No object selected');
                     }
-                } else {
-                    this.canvas.requestPointerLock();
                 }
             }
         });
@@ -68,19 +65,12 @@ export class InputController {
         document.addEventListener('mouseup', (event) => {
             if (event.button === 0) {
                 this.mouseDown = false;
-                document.exitPointerLock();
             }
         });
 
-        document.addEventListener('mousemove', (event) => {
-            if (document.pointerLockElement === this.canvas) {
-                this.handleMouseMovement(event.movementX, event.movementY);
-            }
-        });
-
-        // Alternative for when pointer lock is not available
+        // Mouse movement handling
         this.canvas.addEventListener('mousemove', (event) => {
-            if (this.mouseDown && document.pointerLockElement !== this.canvas) {
+            if (this.mouseDown) {
                 if (this.firstMouse) {
                     this.lastMouseX = event.clientX;
                     this.lastMouseY = event.clientY;
@@ -89,7 +79,7 @@ export class InputController {
                 }
 
                 const xOffset = (this.mouseInvertX ? -1 : 1) * (event.clientX - this.lastMouseX);
-                const yOffset = (this.mouseInvertY ? -1 : 1) * (this.lastMouseY - event.clientY);
+                const yOffset = (this.mouseInvertY ? -1 : 1) * (event.clientY - this.lastMouseY);
 
                 this.lastMouseX = event.clientX;
                 this.lastMouseY = event.clientY;

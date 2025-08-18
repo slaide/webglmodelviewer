@@ -3,6 +3,7 @@ import { debugLog } from './debug-logger';
 import { InputController } from './input-controller';
 import { SettingsController } from './settings-controller';
 import { ObjectEditor } from './object-editor';
+import { ObjectTreePanel } from './object-tree-panel';
 
 function main() {
     const canvas = document.getElementById('glcanvas') as HTMLCanvasElement;
@@ -29,6 +30,7 @@ function main() {
     const inputController = new InputController(canvas, renderer.getCamera(), renderer);
     const settingsController = new SettingsController(inputController, renderer.getCamera(), renderer);
     const objectEditor = new ObjectEditor(renderer);
+    const treePanel = new ObjectTreePanel(renderer, objectEditor);
     
     let lastTime = 0;
     function render(currentTime: number) {
@@ -37,6 +39,7 @@ function main() {
         
         inputController.update(deltaTime);
         objectEditor.checkForSelection();
+        treePanel.syncWithRenderer(); // Keep tree selection in sync
         renderer.render();
         requestAnimationFrame(render);
     }

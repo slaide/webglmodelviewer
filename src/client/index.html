@@ -90,6 +90,58 @@
             font-size: 12px;
             cursor: pointer;
         }
+        .tree-node {
+            margin: 2px 0;
+            padding: 2px 4px;
+            cursor: pointer;
+            border-radius: 2px;
+            user-select: none;
+            font-size: 11px;
+        }
+        .tree-node:hover {
+            background-color: #e0e0e0;
+        }
+        .tree-node.selected {
+            background-color: #007acc;
+            color: white;
+        }
+        .tree-node-content {
+            display: flex;
+            align-items: center;
+        }
+        .tree-expand-button {
+            width: 16px;
+            height: 16px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 10px;
+            margin-right: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .tree-expand-button:hover {
+            background-color: rgba(0, 0, 0, 0.1);
+            border-radius: 2px;
+        }
+        .tree-node-icon {
+            margin-right: 4px;
+            font-size: 10px;
+        }
+        .tree-node-label {
+            flex: 1;
+        }
+        .tree-children {
+            margin-left: 16px;
+            border-left: 1px dotted #ccc;
+            padding-left: 4px;
+        }
+        .tree-node-info {
+            margin-left: 4px;
+            color: #666;
+            font-size: 10px;
+        }
     </style>
 </head>
 <body>
@@ -99,6 +151,7 @@
             <button class="tab-button active" onclick="switchTab('console')">Console</button>
             <button class="tab-button" onclick="switchTab('settings')">Settings</button>
             <button class="tab-button" onclick="switchTab('objects')">Objects</button>
+            <button class="tab-button" onclick="switchTab('tree')">Tree</button>
         </div>
         
         <div id="console-tab" class="tab-content active">
@@ -218,15 +271,8 @@
                     <h4>Material</h4>
                     
                     <div class="checkbox-row">
-                        <label style="width: 60px; display: inline-block;">Color:</label>
-                    </div>
-                    <div class="checkbox-row">
-                        <label style="width: 20px;">R:</label>
-                        <input type="range" id="color-r" min="0" max="1" step="0.01" style="width: 60px; margin-right: 5px;">
-                        <label style="width: 20px;">G:</label>
-                        <input type="range" id="color-g" min="0" max="1" step="0.01" style="width: 60px; margin-right: 5px;">
-                        <label style="width: 20px;">B:</label>
-                        <input type="range" id="color-b" min="0" max="1" step="0.01" style="width: 60px;">
+                        <label for="color-picker" style="width: 60px; display: inline-block;">Color:</label>
+                        <input type="color" id="color-picker" style="width: 60px; height: 30px; border: none; border-radius: 4px; cursor: pointer;">
                     </div>
                     
                     <div class="checkbox-row">
@@ -249,12 +295,41 @@
                     
                     <div class="checkbox-row">
                         <label for="shininess" style="width: 80px;">Shininess:</label>
-                        <input type="range" id="shininess" min="1" max="128" step="1" style="flex: 1;">
+                        <input type="range" id="shininess" min="0" max="8" step="0.1" style="flex: 1;">
                         <span id="shininess-value" style="margin-left: 10px; font-size: 11px; width: 30px;">32</span>
                     </div>
                 </div>
             </div>
         </div>
+        
+        <div id="tree-tab" class="tab-content">
+            <div class="control-group">
+                <h4>Scene Hierarchy</h4>
+                <div id="tree-container" style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 8px; max-height: 400px; overflow-y: auto;">
+                    <div id="tree-content">
+                        <!-- Tree will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <script>
+        function switchTab(tabName) {
+            // Hide all tabs
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            // Hide all buttons
+            const buttons = document.querySelectorAll('.tab-button');
+            buttons.forEach(button => button.classList.remove('active'));
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // Activate selected button
+            event.target.classList.add('active');
+        }
+    </script>
 </body>
 </html>

@@ -5,6 +5,8 @@ import { Camera } from './camera';
 import { Light } from './lighting';
 import { debugLog } from './debug-logger';
 import { SceneObject } from './scene-object';
+import { SceneNode } from './scene-node';
+import { Drawable } from './drawable';
 import { RayCaster } from './ray-casting';
 import { WireframeBox } from './geometry/wireframe-box';
 import { wireframeVertexShader, wireframeFragmentShader } from './shaders/wireframe-shader';
@@ -15,8 +17,10 @@ export class WebGLRenderer {
     private wireframeShaderProgram!: ShaderProgram;
     private camera!: Camera;
     private lights: Light[] = [];
-    private sceneObjects: SceneObject[] = [];
+    private sceneObjects: SceneObject[] = []; // Keep for backward compatibility
+    private sceneRoot: SceneNode = new SceneNode('root', 'Scene Root');
     private selectedObject: SceneObject | null = null;
+    private hoveredObject: SceneObject | null = null;
     private wireframeBox!: WireframeBox;
     private showBoundingBoxes = true;
     private showObjects = true;
@@ -64,21 +68,38 @@ export class WebGLRenderer {
     }
 
     private setupScene() {
-        // Create a few cube objects
-        const cube1 = new SceneObject('cube1', 'Cube 1', new Cube(this.gl));
+        // Create a hierarchical scene with some parent-child relationships
+        const cube1 = new SceneObject('cube1', 'Main Cube', new Cube(this.gl));
         cube1.position = vec3.fromValues(0, 0, 0);
         cube1.material.color = vec3.fromValues(0.8, 0.6, 0.4);
 
-        const cube2 = new SceneObject('cube2', 'Cube 2', new Cube(this.gl));
+        const cube2 = new SceneObject('cube2', 'Child Cube 1', new Cube(this.gl));
         cube2.position = vec3.fromValues(3, 0, 0);
         cube2.material.color = vec3.fromValues(0.4, 0.8, 0.6);
 
-        const cube3 = new SceneObject('cube3', 'Cube 3', new Cube(this.gl));
+        const cube3 = new SceneObject('cube3', 'Child Cube 2', new Cube(this.gl));
         cube3.position = vec3.fromValues(-3, 0, 0);
         cube3.material.color = vec3.fromValues(0.6, 0.4, 0.8);
 
-        this.sceneObjects = [cube1, cube2, cube3];
-        debugLog.info(`Setup ${this.sceneObjects.length} scene objects`);
+        // Create a group node (non-drawable container)
+        const group = new SceneNode('group1', 'Cube Group');
+        group.transform.setPosition(0, 2, 0);
+
+        const groupedCube = new SceneObject('cube4', 'Grouped Cube', new Cube(this.gl));
+        groupedCube.position = vec3.fromValues(0, 0, 0); // Relative to group
+        groupedCube.material.color = vec3.fromValues(0.8, 0.4, 0.8);
+
+        // Build hierarchy
+        this.sceneRoot.addChild(cube1);
+        this.sceneRoot.addChild(cube2);
+        this.sceneRoot.addChild(cube3);
+        this.sceneRoot.addChild(group);
+        group.addChild(groupedCube);
+
+        // Keep backward compatibility
+        this.sceneObjects = [cube1, cube2, cube3, groupedCube];
+        debugLog.info(`Setup ${this.sceneObjects.length} scene objects in hierarchical tree`);
+        debugLog.info(`Scene tree:\n${this.printSceneTree()}`);
     }
 
     render() {
@@ -97,20 +118,18 @@ export class WebGLRenderer {
                 this.shaderProgram.setVector3(`u_lights[${i}].color`, this.lights[i].color);
             }
 
-            // Render all scene objects
-            for (const obj of this.sceneObjects) {
-                obj.updateModelMatrix();
-                
+            // Render all drawable objects in the scene tree
+            this.sceneRoot.traverseDrawable((node: SceneNode, drawable: Drawable) => {
                 // Set object-specific uniforms
-                this.shaderProgram.setMatrix4('u_model', obj.modelMatrix);
-                this.shaderProgram.setVector3('u_material.color', obj.material.color);
-                this.shaderProgram.setFloat('u_material.ambient', obj.material.ambient);
-                this.shaderProgram.setFloat('u_material.diffuse', obj.material.diffuse);
-                this.shaderProgram.setFloat('u_material.specular', obj.material.specular);
-                this.shaderProgram.setFloat('u_material.shininess', obj.material.shininess);
+                this.shaderProgram.setMatrix4('u_model', node.getWorldMatrix());
+                this.shaderProgram.setVector3('u_material.color', drawable.material.color);
+                this.shaderProgram.setFloat('u_material.ambient', drawable.material.ambient);
+                this.shaderProgram.setFloat('u_material.diffuse', drawable.material.diffuse);
+                this.shaderProgram.setFloat('u_material.specular', drawable.material.specular);
+                this.shaderProgram.setFloat('u_material.shininess', drawable.material.shininess);
 
-                obj.render();
-            }
+                drawable.render();
+            });
         }
 
         // Render bounding boxes if enabled
@@ -120,18 +139,32 @@ export class WebGLRenderer {
             this.wireframeShaderProgram.setMatrix4('uViewMatrix', this.camera.getViewMatrix());
             this.wireframeShaderProgram.setMatrix4('uProjectionMatrix', this.camera.getProjectionMatrix());
 
-            for (const obj of this.sceneObjects) {
-                if (obj.selected) {
-                    // Use local bounding box with object's model matrix
-                    this.wireframeBox.initialize(obj.boundingBox);
+            // Render bounding boxes for selected and hovered objects
+            this.sceneRoot.traverse((node: SceneNode) => {
+                if (node instanceof SceneObject && node.drawable) {
+                    let shouldRender = false;
+                    let color = vec3.fromValues(1, 1, 0); // Default yellow
                     
-                    // Apply the object's transformation to the wireframe
-                    this.wireframeShaderProgram.setMatrix4('uModelMatrix', obj.modelMatrix);
-                    this.wireframeShaderProgram.setVector3('uColor', vec3.fromValues(1, 1, 0)); // Yellow wireframe
+                    if (node.selected) {
+                        shouldRender = true;
+                        color = vec3.fromValues(1, 1, 0); // Yellow for selected
+                    } else if (this.hoveredObject === node) {
+                        shouldRender = true;
+                        color = vec3.fromValues(0, 1, 1); // Cyan for hovered
+                    }
+                    
+                    if (shouldRender) {
+                        // Use local bounding box with object's world matrix
+                        this.wireframeBox.initialize(node.boundingBox);
+                        
+                        // Apply the object's transformation to the wireframe
+                        this.wireframeShaderProgram.setMatrix4('uModelMatrix', node.getWorldMatrix());
+                        this.wireframeShaderProgram.setVector3('uColor', color);
 
-                    this.wireframeBox.render();
+                        this.wireframeBox.render();
+                    }
                 }
-            }
+            }, true);
             this.gl.enable(this.gl.DEPTH_TEST);
         }
     }
@@ -152,15 +185,10 @@ export class WebGLRenderer {
         const height = canvasHeight || this.canvas.height;
         const selectedObject = RayCaster.selectObject(x, y, width, height, this.camera, this.sceneObjects);
         
-        // Clear previous selection
-        if (this.selectedObject) {
-            this.selectedObject.selected = false;
-        }
+        // Use the new selection method
+        this.setSelectedObject(selectedObject);
         
-        // Set new selection
-        this.selectedObject = selectedObject;
         if (this.selectedObject) {
-            this.selectedObject.selected = true;
             debugLog.info(`Selected: ${this.selectedObject.name}`);
         } else {
             debugLog.info('No object selected');
@@ -183,5 +211,83 @@ export class WebGLRenderer {
 
     setShowObjects(show: boolean) {
         this.showObjects = show;
+    }
+
+    // Scene tree management methods
+    getSceneRoot(): SceneNode {
+        return this.sceneRoot;
+    }
+
+    addToScene(node: SceneNode): void {
+        this.sceneRoot.addChild(node);
+        
+        // Update backward compatibility array if it's a SceneObject
+        if (node instanceof SceneObject) {
+            this.sceneObjects.push(node);
+        }
+    }
+
+    removeFromScene(node: SceneNode): void {
+        node.removeFromParent();
+        
+        // Update backward compatibility array if it's a SceneObject
+        if (node instanceof SceneObject) {
+            const index = this.sceneObjects.indexOf(node);
+            if (index !== -1) {
+                this.sceneObjects.splice(index, 1);
+            }
+        }
+    }
+
+    findNodeById(id: string): SceneNode | null {
+        let foundNode: SceneNode | null = null;
+        this.sceneRoot.traverse((node) => {
+            if (node.id === id) {
+                foundNode = node;
+            }
+        });
+        return foundNode;
+    }
+
+    findNodeByName(name: string): SceneNode | null {
+        let foundNode: SceneNode | null = null;
+        this.sceneRoot.traverse((node) => {
+            if (node.name === name) {
+                foundNode = node;
+            }
+        });
+        return foundNode;
+    }
+
+    // Selection management
+    clearAllSelections(): void {
+        this.sceneRoot.traverse((node) => {
+            if (node instanceof SceneObject) {
+                node.selected = false;
+            }
+        });
+        this.selectedObject = null;
+    }
+
+    setSelectedObject(obj: SceneObject | null): void {
+        this.clearAllSelections();
+        if (obj) {
+            obj.selected = true;
+            this.selectedObject = obj;
+        }
+    }
+
+    // Hover management
+    setHoveredObject(obj: SceneObject | null): void {
+        this.hoveredObject = obj;
+    }
+
+    getHoveredObject(): SceneObject | null {
+        return this.hoveredObject;
+    }
+
+    // Debug method to print the scene tree
+    printSceneTree(): string {
+        return this.sceneRoot.printTree();
     }
 }
