@@ -35,12 +35,22 @@ async function main() {
     const inputController = new InputController(canvas, renderer.getCamera(), renderer);
     const settingsController = new SettingsController(inputController, renderer.getCamera(), renderer);
     const projectManager = new ProjectManager();
-    await projectManager.pickProjectDirectory();
     const assetManager = new AssetManager(renderer, projectManager);
     const objectEditor = new ObjectEditor(renderer);
     const treePanel = new ObjectTreePanel(renderer, objectEditor, assetManager);
-    // Load existing project assets into the shelf
-    await assetManager.loadFromProject();
+    // Start screen handler to open project on user gesture
+    const startScreen = document.getElementById('start-screen') as HTMLElement | null;
+    const openProjectStartBtn = document.getElementById('open-project-start') as HTMLButtonElement | null;
+
+    const openProject = async () => {
+        const ok = await projectManager.pickProjectDirectory();
+        if (ok) {
+            assetManager.setProject(projectManager);
+            await assetManager.loadFromProject();
+            if (startScreen) startScreen.style.display = 'none';
+            debugLog.info('Project opened');
+        }
+    };
     
     // Wire up File System Access API buttons
     const saveBtn = document.getElementById('save-scene') as HTMLButtonElement | null;
@@ -93,13 +103,8 @@ async function main() {
     
     saveBtn?.addEventListener('click', saveScene);
     loadBtn?.addEventListener('click', loadScene);
-    openProjectBtn?.addEventListener('click', async () => {
-        const ok = await projectManager.pickProjectDirectory();
-        if (ok) {
-            assetManager.setProject(projectManager);
-            await assetManager.loadFromProject();
-        }
-    });
+    openProjectBtn?.addEventListener('click', openProject);
+    openProjectStartBtn?.addEventListener('click', openProject);
     
     let lastTime = 0;
     function render(currentTime: number) {

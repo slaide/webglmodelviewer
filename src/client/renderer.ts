@@ -70,60 +70,9 @@ export class WebGLRenderer {
     }
 
     private setupScene() {
-        // Create a hierarchical scene with some parent-child relationships
-        const cube1 = new SceneObject('cube1', 'Main Cube', new Cube(this.gl));
-        cube1.position = vec3.fromValues(0, 0, 0);
-        cube1.material.color = vec3.fromValues(0.8, 0.6, 0.4);
-
-        const cube2 = new SceneObject('cube2', 'Child Cube 1', new Cube(this.gl));
-        cube2.position = vec3.fromValues(3, 0, 0);
-        cube2.material.color = vec3.fromValues(0.4, 0.8, 0.6);
-
-        const cube3 = new SceneObject('cube3', 'Child Cube 2', new Cube(this.gl));
-        cube3.position = vec3.fromValues(-3, 0, 0);
-        cube3.material.color = vec3.fromValues(0.6, 0.4, 0.8);
-
-        // Create a group node (non-drawable container)
-        const group = new SceneNode('group1', 'Cube Group');
-        group.transform.setPosition(0, 2, 0);
-
-        const groupedCube = new SceneObject('cube4', 'Grouped Cube', new Cube(this.gl));
-        groupedCube.position = vec3.fromValues(0, 0, 0); // Relative to group
-        groupedCube.material.color = vec3.fromValues(0.8, 0.4, 0.8);
-
-        // Create scene lights as objects
-        const mainLight = new SceneLight('light1', 'Main Light', LightType.POINT);
-        mainLight.transform.setPosition(2, 2, 2);
-        mainLight.setColor(1, 0.8, 0.6);
-        mainLight.setIntensity(1.0);
-
-        const fillLight = new SceneLight('light2', 'Fill Light', LightType.POINT);
-        fillLight.transform.setPosition(-2, 1, 1);
-        fillLight.setColor(0.6, 0.8, 1);
-        fillLight.setIntensity(0.8);
-
-        const accentLight = new SceneLight('light3', 'Accent Light', LightType.DIRECTIONAL);
-        accentLight.transform.setPosition(0, 5, 2);
-        accentLight.setDirection(0, -1, -0.3);
-        accentLight.setColor(0.8, 1, 0.8);
-        accentLight.setIntensity(0.6);
-
-        // Build hierarchy
-        this.sceneRoot.addChild(cube1);
-        this.sceneRoot.addChild(cube2);
-        this.sceneRoot.addChild(cube3);
-        this.sceneRoot.addChild(group);
-        group.addChild(groupedCube);
-        
-        // Add lights to scene
-        this.sceneRoot.addChild(mainLight);
-        this.sceneRoot.addChild(fillLight);
-        this.sceneRoot.addChild(accentLight);
-
-        // Keep backward compatibility
-        this.sceneObjects = [cube1, cube2, cube3, groupedCube];
-        debugLog.info(`Setup ${this.sceneObjects.length} scene objects in hierarchical tree with lights`);
-        debugLog.info(`Scene tree:\n${this.printSceneTree()}`);
+        // Start with an empty scene by default (only root node)
+        this.sceneObjects = [];
+        debugLog.info('Initialized empty scene (root only)');
     }
 
     // Scene serialization
