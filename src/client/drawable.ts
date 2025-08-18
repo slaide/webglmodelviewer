@@ -16,10 +16,12 @@ export interface BoundingBox {
 
 export interface Geometry {
     render(): void;
+    renderWireframe?(): void;
 }
 
 export class Drawable {
     public visible: boolean = true;
+    public wireframe: boolean = false;
     public material: Material;
     public geometry: Geometry;
     public boundingBox: BoundingBox;
@@ -57,7 +59,11 @@ export class Drawable {
 
     public render(): void {
         if (this.visible) {
-            this.geometry.render();
+            if (this.wireframe && this.geometry.renderWireframe) {
+                this.geometry.renderWireframe();
+            } else {
+                this.geometry.render();
+            }
         }
     }
 

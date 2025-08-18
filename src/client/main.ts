@@ -4,6 +4,8 @@ import { InputController } from './input-controller';
 import { SettingsController } from './settings-controller';
 import { ObjectEditor } from './object-editor';
 import { ObjectTreePanel } from './object-tree-panel';
+import { AssetManager } from './asset-manager';
+import { SceneAST } from './scene-io';
 
 function main() {
     const canvas = document.getElementById('glcanvas') as HTMLCanvasElement;
@@ -13,8 +15,10 @@ function main() {
     }
 
     // Canvas takes 70% of window width
+    const shelf = document.getElementById('asset-shelf') as HTMLElement | null;
+    const shelfHeight = shelf ? shelf.offsetHeight : 0;
     const canvasWidth = Math.floor(window.innerWidth * 0.7);
-    const canvasHeight = window.innerHeight;
+    const canvasHeight = window.innerHeight - shelfHeight;
     
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
@@ -29,8 +33,54 @@ function main() {
 
     const inputController = new InputController(canvas, renderer.getCamera(), renderer);
     const settingsController = new SettingsController(inputController, renderer.getCamera(), renderer);
+    const assetManager = new AssetManager(renderer);
     const objectEditor = new ObjectEditor(renderer);
-    const treePanel = new ObjectTreePanel(renderer, objectEditor);
+    const treePanel = new ObjectTreePanel(renderer, objectEditor, assetManager);
+    
+    // Wire up File System Access API buttons
+    const saveBtn = document.getElementById('save-scene') as HTMLButtonElement | null;
+    const loadBtn = document.getElementById('load-scene') as HTMLButtonElement | null;
+    
+    async function saveScene() {
+        try {
+            const ast: SceneAST = renderer.exportSceneAST();
+            const opts = {
+                suggestedName: 'scene.json',
+                types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }]
+            } as any;
+            // @ts-ignore - File System Access API may not be typed
+            const handle = await (window as any).showSaveFilePicker(opts);
+            const writable = await handle.createWritable();
+            await writable.write(JSON.stringify(ast, null, 2));
+            await writable.close();
+            debugLog.info('Scene saved to disk.');
+        } catch (err) {
+            debugLog.error(`Save failed: ${err}`);
+        }
+    }
+
+    async function loadScene() {
+        try {
+            const opts = {
+                multiple: false,
+                types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }]
+            } as any;
+            // @ts-ignore
+            const [handle] = await (window as any).showOpenFilePicker(opts);
+            const file = await handle.getFile();
+            const text = await file.text();
+            const ast = JSON.parse(text) as SceneAST;
+            renderer.importSceneAST(ast);
+            treePanel.refresh();
+            objectEditor.setSelectedObject(null);
+            debugLog.info('Scene loaded from disk.');
+        } catch (err) {
+            debugLog.error(`Load failed: ${err}`);
+        }
+    }
+    
+    saveBtn?.addEventListener('click', saveScene);
+    loadBtn?.addEventListener('click', loadScene);
     
     let lastTime = 0;
     function render(currentTime: number) {
@@ -48,8 +98,10 @@ function main() {
     debugLog.info('Render loop started with input controls');
 
     window.addEventListener('resize', () => {
+        const shelf2 = document.getElementById('asset-shelf') as HTMLElement | null;
+        const shelfH = shelf2 ? shelf2.offsetHeight : 0;
         const newCanvasWidth = Math.floor(window.innerWidth * 0.7);
-        const newCanvasHeight = window.innerHeight;
+        const newCanvasHeight = window.innerHeight - shelfH;
         
         canvas.width = newCanvasWidth;
         canvas.height = newCanvasHeight;

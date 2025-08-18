@@ -9,20 +9,18 @@
             margin: 0;
             padding: 0;
             background: #000;
-            overflow: hidden;
             font-family: monospace;
             display: flex;
-        }
-        canvas {
-            display: block;
-            width: 70vw;
+            flex-direction: column;
             height: 100vh;
+            overflow: hidden;
         }
+        #main-content { display: flex; flex: 1; min-height: 0; }
+        canvas { display: block; width: 70vw; height: 100%; }
         #debug-panel {
             width: 30vw;
-            height: 100vh;
-            background: #ffffff;
-            color: #000000;
+            background: #1e1e1e;
+            color: #ddd;
             display: flex;
             flex-direction: column;
             font-size: 12px;
@@ -30,23 +28,24 @@
         }
         .tab-bar {
             display: flex;
-            background: #f0f0f0;
-            border-bottom: 1px solid #ccc;
+            background: #2a2a2a;
+            border-bottom: 1px solid #333;
         }
         .tab-button {
             flex: 1;
             padding: 10px;
-            background: #e0e0e0;
+            background: #2a2a2a;
+            color: #ddd;
             border: none;
             cursor: pointer;
             font-size: 12px;
-            border-right: 1px solid #ccc;
+            border-right: 1px solid #333;
         }
         .tab-button:last-child {
             border-right: none;
         }
         .tab-button.active {
-            background: #ffffff;
+            background: #1e1e1e;
             font-weight: bold;
         }
         .tab-content {
@@ -71,7 +70,8 @@
         .control-group {
             margin-bottom: 15px;
             padding: 10px;
-            background: #f8f8f8;
+            background: #2a2a2a;
+            border: 1px solid #333;
             border-radius: 4px;
         }
         .control-group h4 {
@@ -97,14 +97,49 @@
             border-radius: 2px;
             user-select: none;
             font-size: 11px;
+            color: #ddd;
+            position: relative; /* for drop indicators */
+        }
+        .asset-item {
+            padding: 6px 8px;
+            background: #2a2a2a;
+            color: #ddd;
+            border: 1px solid #444;
+            border-radius: 4px;
+            cursor: grab;
+        }
+        #assets-drop-zone.hover {
+            border-color: #007acc;
+            background: #eef6ff;
         }
         .tree-node:hover {
-            background-color: #e0e0e0;
+            background-color: #2a2a2a;
         }
         .tree-node.selected {
             background-color: #007acc;
             color: white;
         }
+        .tree-node.drop-target {
+            outline: 2px dashed #66aaff;
+            background-color: rgba(102, 170, 255, 0.12);
+        }
+        /* Strong, highly visible drop indicators */
+        .tree-node.drop-into {
+            outline: 2px dashed #00b7ff;
+            background-color: rgba(0, 183, 255, 0.18);
+        }
+        .tree-node.drop-before::before,
+        .tree-node.drop-after::after {
+            content: '';
+            position: absolute;
+            left: 0; right: 0;
+            height: 3px;
+            background: #00b7ff;
+            box-shadow: 0 0 6px rgba(0,183,255,0.9);
+            z-index: 1;
+        }
+        .tree-node.drop-before::before { top: -1px; }
+        .tree-node.drop-after::after { bottom: -1px; }
         .tree-node-content {
             display: flex;
             align-items: center;
@@ -134,28 +169,103 @@
         }
         .tree-children {
             margin-left: 16px;
-            border-left: 1px dotted #ccc;
+            border-left: 1px dotted #444;
             padding-left: 4px;
         }
         .tree-node-info {
             margin-left: 4px;
-            color: #666;
+            color: #aaa;
             font-size: 10px;
+        }
+
+        /* Form controls - dark theme */
+        input[type="text"],
+        input[type="number"],
+        input[type="checkbox"],
+        select,
+        button,
+        textarea {
+            background-color: #1e1e1e;
+            color: #ddd;
+            border: 1px solid #444;
+        }
+        input[type="number"], input[type="text"], select, textarea {
+            padding: 4px 6px;
+            border-radius: 3px;
+        }
+        input[type="checkbox"] {
+            accent-color: #007acc;
+            border: 1px solid #444;
+        }
+        input[type="color"] {
+            background: #1e1e1e;
+            border: 1px solid #444;
+        }
+        /* Range slider styling */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 4px;
+            background: #444;
+            border-radius: 2px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            margin-top: -6px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #bbb;
+            border: 1px solid #666;
+        }
+        input[type="range"]::-moz-range-track {
+            height: 4px;
+            background: #444;
+            border-radius: 2px;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #bbb;
+            border: 1px solid #666;
+        }
+
+        /* Editable object name (title) */
+        #object-name[contenteditable="true"] {
+            cursor: text;
+            border-bottom: 1px dashed #444;
+            padding-bottom: 2px;
+        }
+        #object-name[contenteditable="true"]:focus {
+            outline: none;
+            border-bottom-color: #00b7ff;
+            box-shadow: 0 2px 0 0 #00b7ff;
+        }
+        /* Optional hint when empty */
+        #object-name[contenteditable="true"]:empty:before {
+            content: 'Enter name';
+            color: #666;
         }
     </style>
 </head>
 <body>
-    <canvas id="glcanvas"></canvas>
-    <div id="debug-panel">
+    <div id="main-content">
+        <canvas id="glcanvas"></canvas>
+        <div id="debug-panel">
         <div class="tab-bar">
             <button class="tab-button active" onclick="switchTab('console')">Console</button>
             <button class="tab-button" onclick="switchTab('settings')">Settings</button>
-            <button class="tab-button" onclick="switchTab('objects')">Objects</button>
-            <button class="tab-button" onclick="switchTab('tree')">Tree</button>
+            <button class="tab-button" onclick="switchTab('editor')">Editor</button>
         </div>
         
         <div id="console-tab" class="tab-content active">
-            <div style="background: #f0f0f0; padding: 8px; margin-bottom: 10px; border-radius: 4px; font-size: 11px;">
+            <div style="background: #2a2a2a; padding: 8px; margin-bottom: 10px; border-radius: 4px; font-size: 11px; border: 1px solid #333; color: #ddd;">
                 <strong>Controls:</strong><br>
                 WASD / Arrow keys: Move camera<br>
                 Mouse drag / Touch drag: Look around<br>
@@ -166,6 +276,14 @@
         </div>
         
         <div id="settings-tab" class="tab-content">
+            <div class="control-group">
+                <h4>Scene IO</h4>
+                <div style="display: flex; gap: 8px;">
+                    <button id="save-scene" style="padding: 5px 10px; background: #2d8f2d; color: white; border: none; border-radius: 3px; cursor: pointer;">Save Scene (JSON)</button>
+                    <button id="load-scene" style="padding: 5px 10px; background: #8f6f2d; color: white; border: none; border-radius: 3px; cursor: pointer;">Load Scene (JSON)</button>
+                </div>
+                <div style="margin-top: 6px; color: #555; font-size: 11px;">Uses the browser File System Access API.</div>
+            </div>
             <div class="control-group">
                 <h4>Mouse Controls</h4>
                 <div class="checkbox-row">
@@ -217,14 +335,14 @@
             </div>
         </div>
         
-        <div id="objects-tab" class="tab-content">
+        <div id="editor-tab" class="tab-content">
             <div id="no-selection" style="text-align: center; color: #666; margin-top: 50px;">
                 Click on an object to select and edit it
             </div>
             
             <div id="object-editor" style="display: none;">
                 <div class="control-group">
-                    <h4 id="object-name">Selected Object</h4>
+                    <h4 id="object-name" contenteditable="true" title="Click to rename">Selected Object</h4>
                     
                     <div style="margin-bottom: 15px;">
                         <strong>Transform</strong>
@@ -276,6 +394,11 @@
                     </div>
                     
                     <div class="checkbox-row">
+                        <input type="checkbox" id="wireframe-mode">
+                        <label for="wireframe-mode">Wireframe Mode</label>
+                    </div>
+                    
+                    <div class="checkbox-row">
                         <label for="ambient" style="width: 80px;">Ambient:</label>
                         <input type="range" id="ambient" min="0" max="1" step="0.01" style="flex: 1;">
                         <span id="ambient-value" style="margin-left: 10px; font-size: 11px; width: 30px;">0.1</span>
@@ -299,18 +422,86 @@
                         <span id="shininess-value" style="margin-left: 10px; font-size: 11px; width: 30px;">32</span>
                     </div>
                 </div>
+                
+                <div id="light-properties" class="control-group" style="display: none;">
+                    <h4>Light Properties</h4>
+                    
+                    <div class="checkbox-row">
+                        <label for="light-type" style="width: 80px;">Type:</label>
+                        <select id="light-type" style="flex: 1;">
+                            <option value="point">Point Light</option>
+                            <option value="directional">Directional Light</option>
+                            <option value="spot">Spot Light</option>
+                        </select>
+                    </div>
+                    
+                    <div class="checkbox-row">
+                        <label for="light-color" style="width: 80px;">Color:</label>
+                        <input type="color" id="light-color" style="width: 60px; height: 30px; border: none; border-radius: 4px; cursor: pointer;">
+                    </div>
+                    
+                    <div class="checkbox-row">
+                        <label for="light-intensity" style="width: 80px;">Intensity:</label>
+                        <input type="range" id="light-intensity" min="0" max="3" step="0.1" style="flex: 1;">
+                        <span id="light-intensity-value" style="margin-left: 10px; font-size: 11px; width: 30px;">1.0</span>
+                    </div>
+                    
+                    <div id="light-range-control" class="checkbox-row">
+                        <label for="light-range" style="width: 80px;">Range:</label>
+                        <input type="range" id="light-range" min="0.1" max="50" step="0.5" style="flex: 1;">
+                        <span id="light-range-value" style="margin-left: 10px; font-size: 11px; width: 30px;">10.0</span>
+                    </div>
+                    
+                    <div id="light-direction-control" class="checkbox-row" style="display: none;">
+                        <label style="width: 80px; display: inline-block;">Direction:</label>
+                    </div>
+                    <div id="light-direction-inputs" class="checkbox-row" style="display: none;">
+                        <label style="width: 20px;">X:</label>
+                        <input type="number" id="light-dir-x" step="0.1" style="width: 60px; margin-right: 5px;">
+                        <label style="width: 20px;">Y:</label>
+                        <input type="number" id="light-dir-y" step="0.1" style="width: 60px; margin-right: 5px;">
+                        <label style="width: 20px;">Z:</label>
+                        <input type="number" id="light-dir-z" step="0.1" style="width: 60px;">
+                    </div>
+                    
+                    <div id="light-spot-controls" style="display: none;">
+                        <div class="checkbox-row">
+                            <label for="light-inner-angle" style="width: 80px;">Inner Angle:</label>
+                            <input type="range" id="light-inner-angle" min="1" max="89" step="1" style="flex: 1;">
+                            <span id="light-inner-angle-value" style="margin-left: 10px; font-size: 11px; width: 30px;">30°</span>
+                        </div>
+                        <div class="checkbox-row">
+                            <label for="light-outer-angle" style="width: 80px;">Outer Angle:</label>
+                            <input type="range" id="light-outer-angle" min="1" max="89" step="1" style="flex: 1;">
+                            <span id="light-outer-angle-value" style="margin-left: 10px; font-size: 11px; width: 30px;">45°</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         
-        <div id="tree-tab" class="tab-content">
+        <div class="tab-content active" style="display:block">
             <div class="control-group">
                 <h4>Scene Hierarchy</h4>
-                <div id="tree-container" style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 8px; max-height: 400px; overflow-y: auto;">
+                
+                <div id="tree-container" style="background: #1f1f1f; border: 1px solid #333; border-radius: 4px; padding: 8px; max-height: 300px; overflow-y: auto;">
                     <div id="tree-content">
                         <!-- Tree will be populated here -->
                     </div>
                 </div>
             </div>
+        </div>
+        </div>
+    </div>
+
+    <div id="asset-shelf" style="background:#1e1e1e; color:#ddd; border-top:1px solid #333; padding:8px; height:160px;">
+        <div style="max-width: 1200px; margin: 0 auto;">
+            <div id="assets-drop-zone" style="border: 2px dashed #555; padding: 8px; text-align: center; border-radius: 4px; margin-bottom: 8px; cursor: pointer; color: #bbb;">
+                Drag & drop OBJ/MTL files here, or click to browse
+            </div>
+            <input id="assets-file-input" type="file" accept=".obj,.mtl" multiple style="display:none" />
+            <div id="assets-content" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:6px; max-height:80px; overflow-y:auto;"></div>
+            <div style="margin-top: 6px; color: #aaa; font-size: 11px;">Drag assets into the Scene Hierarchy to instantiate.</div>
         </div>
     </div>
 
@@ -325,10 +516,16 @@
             buttons.forEach(button => button.classList.remove('active'));
             
             // Show selected tab
-            document.getElementById(tabName + '-tab').classList.add('active');
+            const el = document.getElementById(tabName + '-tab');
+            if (el) el.classList.add('active');
             
             // Activate selected button
-            event.target.classList.add('active');
+            if (event && event.target) {
+                const tgt = event.target;
+                if (tgt && tgt.classList && typeof tgt.classList.add === 'function') {
+                    tgt.classList.add('active');
+                }
+            }
         }
     </script>
 </body>

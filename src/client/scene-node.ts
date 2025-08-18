@@ -31,6 +31,17 @@ export class SceneNode {
         this.markWorldMatrixDirty();
     }
 
+    // Insert child at a specific index among children
+    public addChildAt(child: SceneNode, index: number): void {
+        if (child._parent) {
+            child._parent.removeChild(child);
+        }
+        child._parent = this;
+        const insertIndex = Math.max(0, Math.min(index, this._children.length));
+        this._children.splice(insertIndex, 0, child);
+        this.markWorldMatrixDirty();
+    }
+
     public removeChild(child: SceneNode): boolean {
         const index = this._children.indexOf(child);
         if (index !== -1) {
@@ -50,6 +61,11 @@ export class SceneNode {
 
     public getParent(): SceneNode | null {
         return this._parent;
+    }
+
+    public getIndexInParent(): number {
+        if (!this._parent) return -1;
+        return this._parent._children.indexOf(this);
     }
 
     public getChildren(): SceneNode[] {

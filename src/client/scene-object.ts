@@ -1,5 +1,4 @@
 import { mat4, vec3 } from 'gl-matrix';
-import { Cube } from './geometry/cube';
 import { SceneNode } from './scene-node';
 import { Drawable, Material, BoundingBox, Geometry } from './drawable';
 
@@ -8,9 +7,9 @@ export { Material, BoundingBox };
 
 export class SceneObject extends SceneNode {
     public selected = false;
-    private _geometry: Cube;
+    private _geometry: Geometry;
 
-    constructor(id: string, name: string, geometry: Cube) {
+    constructor(id: string, name: string, geometry: Geometry) {
         super(id, name);
         this._geometry = geometry;
         
@@ -72,7 +71,7 @@ export class SceneObject extends SceneNode {
         }
     }
 
-    public get geometry(): Cube { return this._geometry; }
+    public get geometry(): Geometry { return this._geometry; }
 
     updateModelMatrix() {
         // No longer needed as we use the transform system
