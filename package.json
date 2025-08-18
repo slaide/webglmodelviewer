@@ -1,0 +1,25 @@
+{
+  "name": "webgl2-phong-app",
+  "version": "1.0.0",
+  "description": "WebGL2 application with Phong shading",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "webpack --mode production",
+    "dev": "webpack serve --mode development",
+    "start": "node dist/server.js",
+    "dev:server": "ts-node src/server.ts"
+  },
+  "dependencies": {
+    "gl-matrix": "^3.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.5.0",
+    "html-webpack-plugin": "^5.5.3",
+    "ts-loader": "^9.4.4",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.1.6",
+    "webpack": "^5.88.2",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^4.15.1"
+  }
+}
