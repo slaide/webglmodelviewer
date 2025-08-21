@@ -3,6 +3,7 @@ import { Cube } from './geometry/cube';
 import { ShaderProgram } from './shaders/shader-program';
 import { Camera } from './camera';
 import { Light, SceneLight, LightType } from './lighting';
+import { MeshRegistry } from './mesh-registry';
 import { debugLog } from './debug-logger';
 import { SceneObject } from './scene-object';
 import { SceneNode } from './scene-node';
@@ -153,7 +154,25 @@ export class WebGLRenderer {
                 this.shaderProgram.setFloat('u_material.specular', drawable.material.specular);
                 this.shaderProgram.setFloat('u_material.shininess', drawable.material.shininess);
 
+                // Texture binding if available
+                const glTex = (drawable as any).glTexture as WebGLTexture | undefined;
+                if (glTex) {
+                    this.gl.activeTexture(this.gl.TEXTURE0);
+                    this.gl.bindTexture(this.gl.TEXTURE_2D, glTex);
+                    const locUse = (this.shaderProgram as any).uniformLocations.get('u_useTexture');
+                    const locSampler = (this.shaderProgram as any).uniformLocations.get('u_diffuseMap');
+                    if (locUse) this.gl.uniform1i(locUse, 1);
+                    if (locSampler) this.gl.uniform1i(locSampler, 0);
+                } else {
+                    const locUse = (this.shaderProgram as any).uniformLocations.get('u_useTexture');
+                    if (locUse) this.gl.uniform1i(locUse, 0);
+                }
+
                 drawable.render();
+
+                if (glTex) {
+                    this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+                }
             });
         }
 
@@ -289,6 +308,10 @@ export class WebGLRenderer {
             const index = this.sceneObjects.indexOf(node);
             if (index !== -1) {
                 this.sceneObjects.splice(index, 1);
+            }
+            const drawable: any = (node as any).drawable;
+            if (drawable && drawable.meshId) {
+                MeshRegistry.release(drawable.meshId);
             }
         }
     }

@@ -380,15 +380,58 @@ export class ObjectEditor {
                     meshInfo.style.display = 'none';
                 }
             }
+            // Mesh sharing info
+            const meshIdEl = document.getElementById('mesh-id') as HTMLElement | null;
+            const meshUsesEl = document.getElementById('mesh-uses') as HTMLElement | null;
+            const meshId = (node.drawable ? (node.drawable as any).meshId : null) as string | null;
+            if (meshIdEl) meshIdEl.textContent = meshId || 'N/A';
+            if (meshUsesEl) {
+                if (meshId) {
+                    let count = 0;
+                    const root = this.renderer.getSceneRoot();
+                    root.traverse(n => {
+                        if ((n as any).drawable && ((n as any).drawable as any).meshId === meshId) count++;
+                    });
+                    meshUsesEl.textContent = String(count);
+                } else {
+                    meshUsesEl.textContent = '0';
+                }
+            }
+            // Update material texture info
+            const texSpan = document.getElementById('material-texture') as HTMLElement | null;
+            if (texSpan) {
+                const tex = (node.drawable && (node.drawable.material as any).texture) ? (node.drawable.material as any).texture : null;
+                texSpan.textContent = tex ? tex : 'None';
+            }
+            // Extra mesh info from stats
+            const uvsEl = document.getElementById('mesh-uvs') as HTMLElement | null;
+            const smoothingEl = document.getElementById('mesh-smoothing') as HTMLElement | null;
+            const groupsEl = document.getElementById('mesh-groups') as HTMLElement | null;
+            const objectsEl = document.getElementById('mesh-objects') as HTMLElement | null;
+            if (stats) {
+                if (uvsEl) uvsEl.textContent = stats.hasUVs ? 'Yes' : 'No';
+                if (smoothingEl) smoothingEl.textContent = stats.smoothing ? 'On' : 'Off';
+                if (groupsEl) groupsEl.textContent = String(stats.groups || 0);
+                if (objectsEl) objectsEl.textContent = String(stats.objects || 0);
+            } else {
+                if (uvsEl) uvsEl.textContent = 'No';
+                if (smoothingEl) smoothingEl.textContent = 'Off';
+                if (groupsEl) groupsEl.textContent = '0';
+                if (objectsEl) objectsEl.textContent = '0';
+            }
         } else if (node instanceof SceneLight) {
             debugLog.info('Updating light controls for SceneLight');
             this.updateLightControls(node);
             const meshInfo = document.getElementById('mesh-info') as HTMLElement | null;
             if (meshInfo) meshInfo.style.display = 'none';
+            const texSpan = document.getElementById('material-texture') as HTMLElement | null;
+            if (texSpan) texSpan.textContent = 'None';
         } else {
             debugLog.info('No additional controls for plain SceneNode');
             const meshInfo = document.getElementById('mesh-info') as HTMLElement | null;
             if (meshInfo) meshInfo.style.display = 'none';
+            const texSpan = document.getElementById('material-texture') as HTMLElement | null;
+            if (texSpan) texSpan.textContent = 'None';
         }
     }
 

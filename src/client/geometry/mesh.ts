@@ -2,16 +2,17 @@ export class Mesh {
   private vao!: WebGLVertexArrayObject;
   private vboPos!: WebGLBuffer;
   private vboNor!: WebGLBuffer;
+  private vboUV?: WebGLBuffer;
   private vertexCount!: number;
 
-  constructor(private gl: WebGL2RenderingContext, positions: Float32Array, normals?: Float32Array) {
+  constructor(private gl: WebGL2RenderingContext, positions: Float32Array, normals?: Float32Array, private meta: any = {}, uvs?: Float32Array) {
     if (!normals || normals.length === 0) {
       normals = this.computeFlatNormals(positions);
     }
-    this.createGeometry(positions, normals);
+    this.createGeometry(positions, normals, uvs);
   }
 
-  private createGeometry(positions: Float32Array, normals: Float32Array) {
+  private createGeometry(positions: Float32Array, normals: Float32Array, uvs?: Float32Array) {
     this.vertexCount = positions.length / 3;
     this.vao = this.gl.createVertexArray()!;
     this.gl.bindVertexArray(this.vao);
@@ -27,6 +28,14 @@ export class Mesh {
     this.gl.bufferData(this.gl.ARRAY_BUFFER, normals, this.gl.STATIC_DRAW);
     this.gl.enableVertexAttribArray(1);
     this.gl.vertexAttribPointer(1, 3, this.gl.FLOAT, false, 0, 0);
+
+    if (uvs && uvs.length === this.vertexCount * 2) {
+      this.vboUV = this.gl.createBuffer()!;
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vboUV);
+      this.gl.bufferData(this.gl.ARRAY_BUFFER, uvs, this.gl.STATIC_DRAW);
+      this.gl.enableVertexAttribArray(2);
+      this.gl.vertexAttribPointer(2, 2, this.gl.FLOAT, false, 0, 0);
+    }
 
     this.gl.bindVertexArray(null);
   }
@@ -59,7 +68,11 @@ export class Mesh {
   getStats() {
     return {
       vertices: this.vertexCount,
-      faces: Math.floor(this.vertexCount / 3)
-    };
+      faces: Math.floor(this.vertexCount / 3),
+      hasUVs: !!this.meta?.hasUVs,
+      smoothing: !!this.meta?.smoothing,
+      groups: Array.isArray(this.meta?.groups) ? this.meta.groups.length : 0,
+      objects: Array.isArray(this.meta?.objects) ? this.meta.objects.length : 0
+    } as any;
   }
 }

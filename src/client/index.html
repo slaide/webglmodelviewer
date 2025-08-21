@@ -252,6 +252,32 @@
             content: 'Enter name';
             color: #666;
         }
+
+        /* Context menu hover and active highlighting */
+        #context-menu .ctx-item,
+        #context-submenu-add-child .ctx-item {
+            user-select: none;
+        }
+        #context-menu .ctx-item:hover,
+        #context-submenu-add-child .ctx-item:hover,
+        #asset-context-menu .ctx-item:hover,
+        #asset-folder-context-menu .ctx-item:hover,
+        #asset-bg-context-menu .ctx-item:hover,
+        #scene-context-menu .ctx-item:hover,
+        .ctx-item.active {
+            background: #3a3a3a;
+        }
+        /* Icon grid tiles */
+        #asset-shelf { --tile-size: 120px; }
+        .tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; padding: 8px; height: var(--tile-size); cursor: pointer; user-select: none; }
+        .tile:hover { background: #333; }
+        .tile .icon { font-size: 28px; }
+        .tile .label { font-size: 11px; color: #ddd; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .drop-target { outline: 2px dashed #66aaff; }
+        /* Path styling in title bar */
+        #assets-path a { color: #ddd; text-decoration: none; }
+        #assets-path a:hover { text-decoration: underline; }
+        #assets-path span { color: #666; }
     </style>
 </head>
 <body>
@@ -280,6 +306,8 @@
                     <h4>Scene IO</h4>
                     <div style="display: flex; gap: 8px;">
                     <button id="open-project" style="padding: 5px 10px; background: #444; color: white; border: none; border-radius: 3px; cursor: pointer;">Open Project</button>
+                    <button id="new-scene" style="padding: 5px 10px; background: #444; color: white; border: none; border-radius: 3px; cursor: pointer;">New Scene</button>
+                    <button id="browse-scenes" style="padding: 5px 10px; background: #444; color: white; border: none; border-radius: 3px; cursor: pointer;">Browse Scenes</button>
                         <button id="save-scene" style="padding: 5px 10px; background: #2d8f2d; color: white; border: none; border-radius: 3px; cursor: pointer;">Save Scene (JSON)</button>
                         <button id="load-scene" style="padding: 5px 10px; background: #8f6f2d; color: white; border: none; border-radius: 3px; cursor: pointer;">Load Scene (JSON)</button>
                     </div>
@@ -396,6 +424,14 @@
                         <label style="width: 80px;">Faces:</label>
                         <span id="mesh-faces">-</span>
                     </div>
+                    <div class="checkbox-row">
+                        <label style="width: 80px;">Mesh ID:</label>
+                        <span id="mesh-id">N/A</span>
+                    </div>
+                    <div class="checkbox-row">
+                        <label style="width: 80px;">Shared:</label>
+                        <span id="mesh-uses">0</span>
+                    </div>
                 </div>
 
                 <div class="control-group">
@@ -491,6 +527,20 @@
                     </div>
                 </div>
             </div>
+
+            <div id="asset-info" style="display: none;">
+                <div class="control-group">
+                    <h4>Asset</h4>
+                    <div class="checkbox-row"><label style="width: 80px;">Name:</label><span id="asset-info-name">-</span></div>
+                    <div class="checkbox-row"><label style="width: 80px;">Path:</label><span id="asset-info-path">-</span></div>
+                    <div class="checkbox-row"><label style="width: 80px;">Vertices:</label><span id="asset-info-verts">-</span></div>
+                    <div class="checkbox-row"><label style="width: 80px;">Submeshes:</label><span id="asset-info-submeshes">-</span></div>
+                    <div class="checkbox-row" style="gap:8px; margin-top:8px;">
+                        <button id="asset-info-rename" style="padding: 4px 8px; background:#444; color:#ddd; border:none; border-radius:3px; cursor:pointer;">Rename…</button>
+                        <button id="asset-info-delete" style="padding: 4px 8px; background:#a83a3a; color:#fff; border:none; border-radius:3px; cursor:pointer;">Delete</button>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div class="tab-content active" style="display:block">
@@ -517,14 +567,152 @@
         </div>
     </div>
 
-    <div id="asset-shelf" style="background:#1e1e1e; color:#ddd; border-top:1px solid #333; padding:8px; height:160px;">
+    <div id="asset-shelf" style="background:#1e1e1e; color:#ddd; border-top:1px solid #333; padding:8px; height:240px;">
         <div style="max-width: 1200px; margin: 0 auto;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button id="shelf-tab-assets" class="tab-button" style="flex:0 0 auto; padding:4px 8px; font-size:11px;">Assets</button>
+                    <span style="color:#666;">|</span>
+                    <button id="shelf-tab-scenes" class="tab-button" style="flex:0 0 auto; padding:4px 8px; font-size:11px;">Scenes</button>
+                    <span style="color:#666;">||</span>
+                    <span id="assets-path" style="color:#aaa; font-size:11px;"></span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="color:#aaa; font-size:11px;">Size</span>
+                    <input id="assets-tile-size" type="range" min="80" max="200" step="4" value="120" style="width:140px;">
+                </div>
+            </div>
             <div id="assets-drop-zone" style="border: 2px dashed #555; padding: 8px; text-align: center; border-radius: 4px; margin-bottom: 8px; cursor: pointer; color: #bbb;">
                 Drag & drop OBJ/MTL files here, or click to browse
             </div>
             <input id="assets-file-input" type="file" accept=".obj,.mtl" multiple style="display:none" />
-            <div id="assets-content" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:6px; max-height:80px; overflow-y:auto;"></div>
-            <div style="margin-top: 6px; color: #aaa; font-size: 11px;">Drag assets into the Scene Hierarchy to instantiate.</div>
+            <div style="display:flex; gap:6px; align-items:center; margin:6px 0;">
+                <span style="color: #aaa; font-size: 11px;">Drag into Scene to instantiate. Right-click background for New Folder.</span>
+            </div>
+            <div id="assets-content" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(var(--tile-size), 1fr)); gap:8px; max-height:120px; overflow-y:auto;"></div>
+            <div id="scenes-content" style="display:none; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:8px; max-height:120px; overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <!-- Context menu for tree actions -->
+    <div id="context-menu" style="position: fixed; display: none; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 4px; min-width: 200px; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.4);">
+        <div class="ctx-item has-submenu" id="ctx-add-child" style="padding: 8px 10px; cursor: pointer; display:flex; align-items:center; justify-content:space-between;">
+            <span>Add Child</span>
+            <span style="opacity:0.7">▸</span>
+        </div>
+        <div class="ctx-sep" style="height:1px; background:#444; margin:4px 0;"></div>
+        <div class="ctx-item" data-action="duplicate" style="padding: 8px 10px; cursor: pointer;">Duplicate</div>
+        <div class="ctx-sep" style="height:1px; background:#444; margin:4px 0;"></div>
+        <div class="ctx-item" data-action="delete" style="padding: 8px 10px; cursor: pointer; color: #ff8a8a;">Delete</div>
+    </div>
+
+    <!-- Submenu: Add Child -->
+    <div id="context-submenu-add-child" style="position: fixed; display: none; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 4px; min-width: 200px; z-index: 2001; box-shadow: 0 4px 12px rgba(0,0,0,0.4); pointer-events: auto;">
+        <div class="ctx-item" data-action="add-child-empty" style="padding: 8px 10px; cursor: pointer;">Empty</div>
+        <div class="ctx-item" data-action="add-child-point" style="padding: 8px 10px; cursor: pointer;">Point Light</div>
+        <div class="ctx-item" data-action="add-child-directional" style="padding: 8px 10px; cursor: pointer;">Directional Light</div>
+        <div class="ctx-item" data-action="add-child-spot" style="padding: 8px 10px; cursor: pointer;">Spot Light</div>
+    </div>
+
+    <!-- Asset context menu -->
+    <div id="asset-context-menu" style="position: fixed; display: none; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 4px; min-width: 180px; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.4);">
+        <div class="ctx-item" data-action="asset-rename" style="padding: 8px 10px; cursor: pointer;">Rename…</div>
+        <div class="ctx-sep" style="height:1px; background:#444; margin:4px 0;"></div>
+        <div class="ctx-item" data-action="asset-delete" style="padding: 8px 10px; cursor: pointer; color: #ff8a8a;">Delete</div>
+    </div>
+
+    <!-- Folder context menu -->
+    <div id="asset-folder-context-menu" style="position: fixed; display: none; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 4px; min-width: 180px; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.4);">
+        <div class="ctx-item" data-action="folder-rename" style="padding: 8px 10px; cursor: pointer;">Rename…</div>
+        <div class="ctx-item" data-action="folder-delete" style="padding: 8px 10px; cursor: pointer; color: #ff8a8a;">Delete</div>
+    </div>
+
+    <!-- Background context menu for asset shelf -->
+    <div id="asset-bg-context-menu" style="position: fixed; display: none; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 4px; min-width: 180px; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.4);">
+        <div class="ctx-item" data-action="bg-folder-new" style="padding: 8px 10px; cursor: pointer;">New Folder…</div>
+        <div class="ctx-item" data-action="bg-scene-new" style="padding: 8px 10px; cursor: pointer;">New Scene…</div>
+        <div class="ctx-item" data-action="bg-scene-saveas" style="padding: 8px 10px; cursor: pointer;">Save Current As…</div>
+    </div>
+
+    <!-- Scene context menu -->
+    <div id="scene-context-menu" style="position: fixed; display: none; background: #2a2a2a; color: #ddd; border: 1px solid #444; border-radius: 4px; min-width: 180px; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.4);">
+        <div class="ctx-item" data-action="scene-open" style="padding: 8px 10px; cursor: pointer;">Open Scene</div>
+        <div class="ctx-item" data-action="scene-rename" style="padding: 8px 10px; cursor: pointer;">Rename…</div>
+        <div class="ctx-item" data-action="scene-delete" style="padding: 8px 10px; cursor: pointer; color:#ff8a8a;">Delete</div>
+    </div>
+
+    <!-- Asset confirm modal overlay -->
+    <div id="asset-confirm-modal" style="position: fixed; inset: 0; display: none; background: rgba(0,0,0,0.6); z-index: 2600; align-items: center; justify-content: center;">
+        <div style="background:#1e1e1e; color:#ddd; border:1px solid #444; border-radius:6px; width: 400px; box-shadow: 0 6px 16px rgba(0,0,0,0.5);">
+            <div style="padding:12px; border-bottom:1px solid #333;">
+                <strong>Confirm Delete</strong>
+            </div>
+            <div style="padding: 12px;">
+                <div id="asset-confirm-message" style="margin-bottom: 12px; color:#ccc;"></div>
+                <div style="display:flex; justify-content:flex-end; gap:8px;">
+                    <button id="asset-confirm-cancel" style="padding: 6px 10px; background:#444; color:#ddd; border:none; border-radius:3px; cursor:pointer;">Cancel</button>
+                    <button id="asset-confirm-accept" style="padding: 6px 10px; background:#a83a3a; color:#fff; border:none; border-radius:3px; cursor:pointer;">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scene Save Confirm Modal -->
+    <div id="scene-save-modal" style="position: fixed; inset: 0; display: none; background: rgba(0,0,0,0.6); z-index: 2600; align-items: center; justify-content: center;">
+        <div style="background:#1e1e1e; color:#ddd; border:1px solid #444; border-radius:6px; width: 420px; box-shadow: 0 6px 16px rgba(0,0,0,0.5);">
+            <div style="padding:12px; border-bottom:1px solid #333;">
+                <strong>Save Current Scene?</strong>
+            </div>
+            <div style="padding: 12px;">
+                <div style="margin-bottom: 12px; color:#ccc;">Save the current scene before continuing?</div>
+                <div style="display:flex; justify-content:flex-end; gap:8px;">
+                    <button id="scene-save-discard" style="padding: 6px 10px; background:#444; color:#ddd; border:none; border-radius:3px; cursor:pointer;">Discard</button>
+                    <button id="scene-save-save" style="padding: 6px 10px; background:#2d8f2d; color:#fff; border:none; border-radius:3px; cursor:pointer;">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scene Delete Confirm Modal -->
+    <div id="scene-confirm-modal" style="position: fixed; inset: 0; display: none; background: rgba(0,0,0,0.6); z-index: 2600; align-items: center; justify-content: center;">
+        <div style="background:#1e1e1e; color:#ddd; border:1px solid #444; border-radius:6px; width: 420px; box-shadow: 0 6px 16px rgba(0,0,0,0.5);">
+            <div style="padding:12px; border-bottom:1px solid #333;">
+                <strong>Confirm Delete</strong>
+            </div>
+            <div style="padding: 12px;">
+                <div id="scene-confirm-message" style="margin-bottom: 12px; color:#ccc;"></div>
+                <div style="display:flex; justify-content:flex-end; gap:8px;">
+                    <button id="scene-confirm-cancel" style="padding: 6px 10px; background:#444; color:#ddd; border:none; border-radius:3px; cursor:pointer;">Cancel</button>
+                    <button id="scene-confirm-accept" style="padding: 6px 10px; background:#a83a3a; color:#fff; border:none; border-radius:3px; cursor:pointer;">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scene browser overlay -->
+    <div id="scene-browser" style="position: fixed; inset: 0; display: none; background: rgba(0,0,0,0.6); z-index: 2500; align-items: center; justify-content: center;">
+        <div style="background:#1e1e1e; color:#ddd; border:1px solid #444; border-radius:6px; width: 420px; max-height: 60vh; overflow:auto; box-shadow: 0 6px 16px rgba(0,0,0,0.5);">
+            <div style="padding:10px; border-bottom:1px solid #333; display:flex; align-items:center; justify-content:space-between;">
+                <strong>Project Scenes</strong>
+                <button id="scene-browser-close" style="padding: 4px 8px; background:#444; color:#ddd; border:none; border-radius:3px; cursor:pointer;">Close</button>
+            </div>
+            <div id="scene-list" style="padding: 10px;"></div>
+        </div>
+    </div>
+
+    <!-- Confirm modal overlay -->
+    <div id="confirm-modal" style="position: fixed; inset: 0; display: none; background: rgba(0,0,0,0.6); z-index: 2600; align-items: center; justify-content: center;">
+        <div style="background:#1e1e1e; color:#ddd; border:1px solid #444; border-radius:6px; width: 400px; box-shadow: 0 6px 16px rgba(0,0,0,0.5);">
+            <div style="padding:12px; border-bottom:1px solid #333;">
+                <strong>Confirm Delete</strong>
+            </div>
+            <div style="padding: 12px;">
+                <div id="confirm-modal-message" style="margin-bottom: 12px; color:#ccc;"></div>
+                <div style="display:flex; justify-content:flex-end; gap:8px;">
+                    <button id="confirm-cancel" style="padding: 6px 10px; background:#444; color:#ddd; border:none; border-radius:3px; cursor:pointer;">Cancel</button>
+                    <button id="confirm-accept" style="padding: 6px 10px; background:#a83a3a; color:#fff; border:none; border-radius:3px; cursor:pointer;">Delete</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -551,5 +739,6 @@
             }
         }
     </script>
+    <script src="bundle.js"></script>
 </body>
 </html>

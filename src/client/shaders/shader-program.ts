@@ -13,6 +13,7 @@ export class ShaderProgram {
         const vertexShaderSource = `#version 300 es
         in vec3 a_position;
         in vec3 a_normal;
+        in vec2 a_texcoord;
         
         uniform mat4 u_model;
         uniform mat4 u_view;
@@ -20,11 +21,13 @@ export class ShaderProgram {
         
         out vec3 v_position;
         out vec3 v_normal;
+        out vec2 v_uv;
         
         void main() {
             vec4 worldPosition = u_model * vec4(a_position, 1.0);
             v_position = worldPosition.xyz;
             v_normal = mat3(u_model) * a_normal;
+            v_uv = a_texcoord;
             
             gl_Position = u_projection * u_view * worldPosition;
         }`;
@@ -49,9 +52,12 @@ export class ShaderProgram {
         uniform vec3 u_viewPos;
         uniform Material u_material;
         uniform bool u_selected;
+        uniform bool u_useTexture;
+        uniform sampler2D u_diffuseMap;
         
         in vec3 v_position;
         in vec3 v_normal;
+        in vec2 v_uv;
         
         out vec4 fragColor;
         
@@ -59,7 +65,12 @@ export class ShaderProgram {
             vec3 normal = normalize(v_normal);
             vec3 color = vec3(0.0);
             
-            vec3 ambient = u_material.ambient * u_material.color;
+            vec3 baseColor = u_material.color;
+            if (u_useTexture) {
+                vec4 tex = texture(u_diffuseMap, v_uv);
+                baseColor *= tex.rgb;
+            }
+            vec3 ambient = u_material.ambient * baseColor;
             
             for (int i = 0; i < 3; i++) {
                 vec3 lightDir = normalize(u_lights[i].position - v_position);
@@ -67,7 +78,7 @@ export class ShaderProgram {
                 vec3 reflectDir = reflect(-lightDir, normal);
                 
                 float diff = max(dot(normal, lightDir), 0.0);
-                vec3 diffuse = u_material.diffuse * diff * u_lights[i].color * u_material.color;
+                vec3 diffuse = u_material.diffuse * diff * u_lights[i].color * baseColor;
                 
                 float spec = pow(max(dot(viewDir, reflectDir), 0.0), u_material.shininess);
                 vec3 specular = u_material.specular * spec * u_lights[i].color;
@@ -122,7 +133,8 @@ export class ShaderProgram {
             'u_lights[1].position', 'u_lights[1].color',
             'u_lights[2].position', 'u_lights[2].color',
             'u_material.color', 'u_material.ambient', 'u_material.diffuse',
-            'u_material.specular', 'u_material.shininess'
+            'u_material.specular', 'u_material.shininess',
+            'u_useTexture', 'u_diffuseMap'
         ];
 
         for (const uniform of uniforms) {

@@ -41,12 +41,24 @@ async function main() {
     // Start screen handler to open project on user gesture
     const startScreen = document.getElementById('start-screen') as HTMLElement | null;
     const openProjectStartBtn = document.getElementById('open-project-start') as HTMLButtonElement | null;
+    const newSceneBtn = document.getElementById('new-scene') as HTMLButtonElement | null;
+    // Shelf tabs and content
+    const shelfTabAssets = document.getElementById('shelf-tab-assets') as HTMLButtonElement | null;
+    const shelfTabScenes = document.getElementById('shelf-tab-scenes') as HTMLButtonElement | null;
+    const assetsContent = document.getElementById('assets-content') as HTMLElement | null;
+    const scenesContent = document.getElementById('scenes-content') as HTMLElement | null;
 
     const openProject = async () => {
         const ok = await projectManager.pickProjectDirectory();
         if (ok) {
-            assetManager.setProject(projectManager);
+            await assetManager.setProject(projectManager);
             await assetManager.loadFromProject();
+            // Try load project settings (nested structure)
+            const cfg = await projectManager.readJSON('config', 'settings.json');
+            if (cfg) {
+                const controls = (cfg.controls) ? cfg.controls : cfg; // fallback for older flat files
+                settingsController.applySettings(controls);
+            }
             if (startScreen) startScreen.style.display = 'none';
             debugLog.info('Project opened');
         }
@@ -55,7 +67,7 @@ async function main() {
     // Wire up File System Access API buttons
     const saveBtn = document.getElementById('save-scene') as HTMLButtonElement | null;
     const loadBtn = document.getElementById('load-scene') as HTMLButtonElement | null;
-    const openProjectBtn = document.getElementById('open-project') as HTMLButtonElement | null;
+    // Removed inline Open Project control; use start screen only
     
     async function saveScene() {
         try {
@@ -103,8 +115,227 @@ async function main() {
     
     saveBtn?.addEventListener('click', saveScene);
     loadBtn?.addEventListener('click', loadScene);
-    openProjectBtn?.addEventListener('click', openProject);
     openProjectStartBtn?.addEventListener('click', openProject);
+    newSceneBtn?.addEventListener('click', async () => { await (window as any).createNewScene?.(); });
+    // Shelf tab switching
+    const hideAllShelfMenus = () => {
+        const bg = document.getElementById('asset-bg-context-menu') as HTMLElement | null;
+        const sm = document.getElementById('scene-context-menu') as HTMLElement | null;
+        const ac = document.getElementById('asset-context-menu') as HTMLElement | null;
+        const fc = document.getElementById('asset-folder-context-menu') as HTMLElement | null;
+        if (bg) bg.style.display = 'none';
+        if (sm) sm.style.display = 'none';
+        if (ac) ac.style.display = 'none';
+        if (fc) fc.style.display = 'none';
+    };
+    const showAssets = () => {
+        if (assetsContent) assetsContent.style.display = 'grid';
+        if (scenesContent) scenesContent.style.display = 'none';
+        hideAllShelfMenus();
+        // Update path line for assets (render list to refresh path)
+        (assetManager as any).renderAssetList?.();
+    };
+    const showScenes = () => {
+        if (assetsContent) assetsContent.style.display = 'none';
+        if (scenesContent) scenesContent.style.display = 'grid';
+        hideAllShelfMenus();
+        // Set path line to Scenes root
+        const path = document.getElementById('assets-path');
+        if (path) path.innerHTML = '- <a href="#" data-path="">scenes</a>';
+        renderScenesGrid();
+    };
+    shelfTabAssets?.addEventListener('click', showAssets);
+    shelfTabScenes?.addEventListener('click', showScenes);
+
+    // Scenes grid rendering and context menus
+    const sceneMenu = document.getElementById('scene-context-menu') as HTMLElement | null;
+    let sceneMenuTarget: string | null = null;
+    document.addEventListener('click', () => { if (sceneMenu) sceneMenu.style.display = 'none'; });
+
+    async function renderScenesGrid() {
+        if (!scenesContent) return;
+        scenesContent.innerHTML = '';
+        if (!projectManager.hasProject()) return;
+        const files = await projectManager.listFiles('scenes');
+        for (const f of files) {
+            if (!f.name.toLowerCase().endsWith('.json')) continue;
+            const tile = document.createElement('div');
+            tile.className = 'tile';
+            tile.innerHTML = `<div class="icon">📄</div><div class="label"></div>`;
+            (tile.querySelector('.label') as HTMLElement).textContent = f.name;
+            tile.oncontextmenu = (e) => {
+                e.preventDefault(); e.stopPropagation();
+                hideAllShelfMenus();
+                sceneMenuTarget = f.name;
+                if (sceneMenu) {
+                    sceneMenu.style.display = 'block';
+                    const rect = sceneMenu.getBoundingClientRect();
+                    const x = Math.min(e.clientX, window.innerWidth - rect.width - 4);
+                    const y = Math.min(e.clientY, window.innerHeight - rect.height - 4);
+                    sceneMenu.style.left = x + 'px'; sceneMenu.style.top = y + 'px';
+                }
+            };
+            scenesContent.appendChild(tile);
+        }
+        // Right-click background for new/save-as (persistent handler)
+        scenesContent.oncontextmenu = (e) => {
+            const target = e.target as HTMLElement;
+            const onTile = !!target.closest('.tile');
+            if (!onTile) {
+                e.preventDefault();
+                hideAllShelfMenus();
+                const bg = document.getElementById('asset-bg-context-menu') as HTMLElement | null;
+                if (bg) {
+                    // Toggle to scenes actions
+                    const folderNew = bg.querySelector('[data-action="bg-folder-new"]') as HTMLElement | null;
+                    const sceneNew = bg.querySelector('[data-action="bg-scene-new"]') as HTMLElement | null;
+                    const sceneSaveAs = bg.querySelector('[data-action="bg-scene-saveas"]') as HTMLElement | null;
+                    if (folderNew) folderNew.style.display = 'none';
+                    if (sceneNew) sceneNew.style.display = 'block';
+                    if (sceneSaveAs) sceneSaveAs.style.display = 'block';
+                    bg.style.display = 'block';
+                    const rect = bg.getBoundingClientRect();
+                    const x = Math.min(e.clientX, window.innerWidth - rect.width - 4);
+                    const y = Math.min(e.clientY, window.innerHeight - rect.height - 4);
+                    bg.style.left = x + 'px'; bg.style.top = y + 'px';
+                }
+            }
+        };
+    }
+
+    async function openSceneByName(name: string) {
+        try {
+            const txt = await projectManager.readTextFrom('scenes', name);
+            if (!txt) return;
+            const ast = JSON.parse(txt) as SceneAST;
+            renderer.importSceneAST(ast);
+            treePanel.refresh();
+            objectEditor.setSelectedObject(null);
+            debugLog.info('Scene loaded: ' + name);
+        } catch (e) { debugLog.error('Failed to load scene: ' + e); }
+    }
+
+    function sceneHasContent(): boolean { return renderer.getSceneRoot().getChildCount() > 0; }
+
+    async function showSceneSaveModal(): Promise<'save'|'discard'|'cancel'> {
+        const modal = document.getElementById('scene-save-modal') as HTMLElement | null;
+        const saveBtn = document.getElementById('scene-save-save') as HTMLButtonElement | null;
+        const discardBtn = document.getElementById('scene-save-discard') as HTMLButtonElement | null;
+        if (!modal || !saveBtn || !discardBtn) return 'cancel';
+        return await new Promise((resolve) => {
+            const onSave = () => { cleanup(); resolve('save'); };
+            const onDiscard = () => { cleanup(); resolve('discard'); };
+            const onBackdrop = (e: Event) => { if (e.target === modal) { cleanup(); resolve('cancel'); } };
+            const cleanup = () => {
+                modal.style.display = 'none';
+                saveBtn.removeEventListener('click', onSave);
+                discardBtn.removeEventListener('click', onDiscard);
+                modal.removeEventListener('click', onBackdrop);
+            };
+            modal.style.display = 'flex';
+            saveBtn.addEventListener('click', onSave);
+            discardBtn.addEventListener('click', onDiscard);
+            modal.addEventListener('click', onBackdrop);
+        });
+    }
+
+    async function confirmSaveIfNeeded(): Promise<boolean> {
+        if (!sceneHasContent()) return true;
+        const choice = await showSceneSaveModal();
+        if (choice === 'save') { await saveScene(); return true; }
+        if (choice === 'discard') { return true; }
+        return false; // cancel
+    }
+
+    sceneMenu?.addEventListener('click', async (e) => {
+        const t = e.target as HTMLElement;
+        const action = t?.getAttribute('data-action');
+        if (!action) return;
+        if (action === 'scene-open' && sceneMenuTarget) {
+            if (!(await confirmSaveIfNeeded())) { sceneMenu.style.display = 'none'; return; }
+            await openSceneByName(sceneMenuTarget);
+            await renderScenesGrid();
+        } else if (action === 'scene-rename' && sceneMenuTarget) {
+            const oldName = sceneMenuTarget;
+            const base = oldName.replace(/\.json$/i, '');
+            const newNameInput = prompt('Rename scene (without .json):', base);
+            if (newNameInput && newNameInput.trim()) {
+                const newName = newNameInput.trim() + '.json';
+                try {
+                    const files = await projectManager.listFiles('scenes');
+                    const exists = files.some(f => f.name.toLowerCase() === newName.toLowerCase());
+                    if (exists) {
+                        const overwrite = window.confirm('A scene with that name exists. Overwrite?');
+                        if (!overwrite) { sceneMenu.style.display = 'none'; return; }
+                    }
+                    await projectManager.moveFile('scenes', oldName, newName);
+                    debugLog.info(`Scene renamed: ${oldName} -> ${newName}`);
+                    await renderScenesGrid();
+                } catch (err) { debugLog.error('Rename failed: ' + err); }
+            }
+        } else if (action === 'scene-delete' && sceneMenuTarget) {
+            const ok = await showSceneDeleteModal(sceneMenuTarget);
+            if (ok) {
+                try { await projectManager.deleteFileAt('scenes', sceneMenuTarget); await renderScenesGrid(); debugLog.info('Scene deleted: ' + sceneMenuTarget); }
+                catch (err) { debugLog.error('Delete failed: ' + err); }
+            }
+        } else if (action === 'scene-saveas') {
+            await saveScene();
+        }
+        sceneMenu.style.display = 'none';
+    });
+
+    async function showSceneDeleteModal(name: string): Promise<boolean> {
+        const modal = document.getElementById('scene-confirm-modal') as HTMLElement | null;
+        const msg = document.getElementById('scene-confirm-message') as HTMLElement | null;
+        const accept = document.getElementById('scene-confirm-accept') as HTMLButtonElement | null;
+        const cancel = document.getElementById('scene-confirm-cancel') as HTMLButtonElement | null;
+        if (!modal || !msg || !accept || !cancel) return false;
+        msg.textContent = `Delete scene "${name}"?`;
+        return await new Promise((resolve) => {
+            const onAccept = () => { cleanup(); resolve(true); };
+            const onCancel = () => { cleanup(); resolve(false); };
+            const onBackdrop = (e: Event) => { if (e.target === modal) { cleanup(); resolve(false); } };
+            const cleanup = () => {
+                modal.style.display = 'none';
+                accept.removeEventListener('click', onAccept);
+                cancel.removeEventListener('click', onCancel);
+                modal.removeEventListener('click', onBackdrop);
+            };
+            modal.style.display = 'flex';
+            accept.addEventListener('click', onAccept);
+            cancel.addEventListener('click', onCancel);
+            modal.addEventListener('click', onBackdrop);
+        });
+    }
+
+    // Expose helpers for asset shelf background menu
+    (window as any).createNewScene = async () => {
+        if (!(await confirmSaveIfNeeded())) return;
+        // Clear current scene
+        const root = renderer.getSceneRoot();
+        const children = root.getChildren();
+        for (const c of children) { c.removeFromParent(); }
+        treePanel.refresh();
+        objectEditor.setSelectedObject(null);
+        debugLog.info('New empty scene created.');
+    };
+    (window as any).saveCurrentSceneAs = async () => {
+        await saveScene();
+    };
+
+
+    // Persist settings to project on change (nested under controls)
+    document.addEventListener('app-settings-changed', async (ev: any) => {
+        if (!projectManager.hasProject()) return;
+        try {
+            const curr = (await projectManager.readJSON('config', 'settings.json')) || {};
+            curr.controls = { ...(curr.controls || {}), ...ev.detail };
+            await projectManager.writeJSON('config', 'settings.json', curr);
+        } catch (e) {
+            debugLog.error('Failed to save settings: ' + e);
+        }
+    });
     
     let lastTime = 0;
     function render(currentTime: number) {
