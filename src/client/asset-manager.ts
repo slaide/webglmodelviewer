@@ -50,13 +50,7 @@ export class AssetManager {
   private container: HTMLElement;
   private gl: WebGL2RenderingContext;
   private textureCache: Map<string, WebGLTexture> = new Map();
-  private assetMenu: HTMLElement | null = null;
   private assetMenuTargetId: string | null = null;
-  private assetConfirmModal: HTMLElement | null = null;
-  private assetConfirmMsg: HTMLElement | null = null;
-  private assetConfirmAccept: HTMLButtonElement | null = null;
-  private assetConfirmCancel: HTMLButtonElement | null = null;
-  private folderMenu: HTMLElement | null = null;
   private folderMenuTargetPath: string | null = null;
   private currentFolderPath: string = '';
 
@@ -77,6 +71,8 @@ export class AssetManager {
         }
       });
     }
+    // Initialize context menus
+    this.initializeContextMenus();
     // Tile size slider
     const shelf = document.getElementById('asset-shelf') as HTMLElement | null;
     const slider = document.getElementById('assets-tile-size') as HTMLInputElement | null;
@@ -226,26 +222,6 @@ export class AssetManager {
     debugLog.info('Loaded assets from project directory');
   }
 
-  private ensureAssetMenuWired() {
-    if (!this.assetMenu) this.assetMenu = document.getElementById('asset-context-menu');
-    if (!this.assetConfirmModal) this.assetConfirmModal = document.getElementById('asset-confirm-modal');
-    if (!this.assetConfirmMsg) this.assetConfirmMsg = document.getElementById('asset-confirm-message');
-    if (!this.assetConfirmAccept) this.assetConfirmAccept = document.getElementById('asset-confirm-accept') as HTMLButtonElement | null;
-    if (!this.assetConfirmCancel) this.assetConfirmCancel = document.getElementById('asset-confirm-cancel') as HTMLButtonElement | null;
-    if (this.assetMenu) {
-      document.addEventListener('click', () => this.hideAssetContextMenu());
-      this.assetMenu.addEventListener('click', (e) => this.onAssetMenuClick(e));
-    }
-    if (this.assetConfirmModal && this.assetConfirmAccept && this.assetConfirmCancel) {
-      this.assetConfirmCancel.addEventListener('click', () => this.hideAssetConfirm());
-      this.assetConfirmModal.addEventListener('click', (e) => { if (e.target === this.assetConfirmModal) this.hideAssetConfirm(); });
-      this.assetConfirmAccept.addEventListener('click', async () => {
-        const id = this.assetMenuTargetId;
-        this.hideAssetConfirm();
-        if (id) await this.deleteAssetById(id);
-      });
-    }
-  }
 
   private async showGlobalConfirm(message: string): Promise<boolean> {
     const modal = document.getElementById('confirm-modal') as HTMLElement | null;
@@ -271,50 +247,116 @@ export class AssetManager {
     });
   }
 
-  // Background context menu for creating folders in current path
-  private bgMenu: HTMLElement | null = null;
-  private ensureBgMenuWired() {
-    if (!this.bgMenu) this.bgMenu = document.getElementById('asset-bg-context-menu');
-    if (this.bgMenu) {
+  // Context menu initialization - wire up once in constructor
+  private initializeContextMenus() {
+    // Background context menu
+    const bgMenu = document.getElementById('asset-bg-context-menu');
+    if (bgMenu) {
       document.addEventListener('click', () => this.hideBgContextMenu());
-      this.bgMenu.addEventListener('click', async (e) => {
-        const t = e.target as HTMLElement;
-        const action = t?.getAttribute('data-action');
-        if (action === 'bg-folder-new') {
-          this.hideBgContextMenu();
-          await this.promptAndCreateFolder(this.currentFolderPath);
-        } else if (action === 'bg-scene-new') {
-          this.hideBgContextMenu();
-          (window as any).createNewScene?.();
-        } else if (action === 'bg-scene-saveas') {
-          this.hideBgContextMenu();
-          (window as any).saveCurrentSceneAs?.();
-        }
+      bgMenu.addEventListener('click', this.handleBgMenuClick.bind(this));
+    }
+    
+    // Asset context menu
+    this.initializeAssetMenu();
+    
+    // Folder context menu
+    this.initializeFolderMenu();
+  }
+
+  private async handleBgMenuClick(e: Event) {
+    const target = e.target as HTMLElement;
+    const action = target?.getAttribute('data-action');
+    if (!action) return;
+
+    this.hideBgContextMenu();
+    
+    switch (action) {
+      case 'bg-folder-new':
+        await this.promptAndCreateFolder(this.currentFolderPath);
+        break;
+      case 'bg-scene-new':
+        await this.handleNewScene();
+        break;
+      case 'bg-scene-saveas':
+        await this.handleSaveSceneAs();
+        break;
+    }
+  }
+
+  private async handleNewScene() {
+    // Call the global function if available, otherwise handle locally
+    if ((window as any).createNewScene) {
+      await (window as any).createNewScene();
+    } else {
+      debugLog.warn('createNewScene function not available');
+    }
+  }
+
+  private async handleSaveSceneAs() {
+    // Call the global function if available, otherwise handle locally  
+    if ((window as any).saveCurrentSceneAs) {
+      await (window as any).saveCurrentSceneAs();
+    } else {
+      debugLog.warn('saveCurrentSceneAs function not available');
+    }
+  }
+
+  private initializeAssetMenu() {
+    const assetMenu = document.getElementById('asset-context-menu');
+    if (assetMenu) {
+      document.addEventListener('click', () => this.hideAssetContextMenu());
+      assetMenu.addEventListener('click', (e) => this.onAssetMenuClick(e));
+    }
+    
+    // Initialize asset confirmation modal
+    const assetConfirmModal = document.getElementById('asset-confirm-modal');
+    const assetConfirmAccept = document.getElementById('asset-confirm-accept') as HTMLButtonElement | null;
+    const assetConfirmCancel = document.getElementById('asset-confirm-cancel') as HTMLButtonElement | null;
+    
+    if (assetConfirmModal && assetConfirmAccept && assetConfirmCancel) {
+      assetConfirmCancel.addEventListener('click', () => this.hideAssetConfirm());
+      assetConfirmModal.addEventListener('click', (e) => { if (e.target === assetConfirmModal) this.hideAssetConfirm(); });
+      assetConfirmAccept.addEventListener('click', async () => {
+        const id = this.assetMenuTargetId;
+        this.hideAssetConfirm();
+        if (id) await this.deleteAssetById(id);
       });
     }
   }
+
+  private initializeFolderMenu() {
+    const folderMenu = document.getElementById('asset-folder-context-menu');
+    if (folderMenu) {
+      document.addEventListener('click', () => this.hideFolderContextMenu());
+      folderMenu.addEventListener('click', (e) => this.onFolderMenuClick(e));
+    }
+  }
   private showBgContextMenu(x: number, y: number) {
-    this.ensureBgMenuWired();
-    if (!this.bgMenu) return;
+    const bgMenu = document.getElementById('asset-bg-context-menu');
+    if (!bgMenu) return;
+    
     // Toggle items based on active tab (assets vs scenes)
     const assetsGrid = document.getElementById('assets-content') as HTMLElement | null;
     const scenesGrid = document.getElementById('scenes-content') as HTMLElement | null;
     const isScenes = !!(scenesGrid && getComputedStyle(scenesGrid).display !== 'none');
-    const folderNew = this.bgMenu.querySelector('[data-action="bg-folder-new"]') as HTMLElement | null;
-    const sceneNew = this.bgMenu.querySelector('[data-action="bg-scene-new"]') as HTMLElement | null;
-    const sceneSaveAs = this.bgMenu.querySelector('[data-action="bg-scene-saveas"]') as HTMLElement | null;
+    const folderNew = bgMenu.querySelector('[data-action="bg-folder-new"]') as HTMLElement | null;
+    const sceneNew = bgMenu.querySelector('[data-action="bg-scene-new"]') as HTMLElement | null;
+    const sceneSaveAs = bgMenu.querySelector('[data-action="bg-scene-saveas"]') as HTMLElement | null;
     if (folderNew) folderNew.style.display = isScenes ? 'none' : 'block';
     if (sceneNew) sceneNew.style.display = isScenes ? 'block' : 'none';
     if (sceneSaveAs) sceneSaveAs.style.display = isScenes ? 'block' : 'none';
-    this.bgMenu.style.display = 'block';
-    const rect = this.bgMenu.getBoundingClientRect();
+    bgMenu.style.display = 'block';
+    const rect = bgMenu.getBoundingClientRect();
     const vw = window.innerWidth, vh = window.innerHeight;
     const posX = Math.min(x, vw - rect.width - 4);
     const posY = Math.min(y, vh - rect.height - 4);
-    this.bgMenu.style.left = posX + 'px';
-    this.bgMenu.style.top = posY + 'px';
+    bgMenu.style.left = posX + 'px';
+    bgMenu.style.top = posY + 'px';
   }
-  private hideBgContextMenu() { if (this.bgMenu) this.bgMenu.style.display = 'none'; }
+  private hideBgContextMenu() { 
+    const bgMenu = document.getElementById('asset-bg-context-menu');
+    if (bgMenu) bgMenu.style.display = 'none'; 
+  }
 
   // Persist tile size in project config
   private async loadTileSizeFromProject() {
@@ -337,20 +379,21 @@ export class AssetManager {
   }
 
   private showAssetContextMenu(x: number, y: number, asset: Asset) {
-    this.ensureAssetMenuWired();
+    const assetMenu = document.getElementById('asset-context-menu');
     this.assetMenuTargetId = asset.id;
-    if (!this.assetMenu) return;
-    this.assetMenu.style.display = 'block';
-    const rect = this.assetMenu.getBoundingClientRect();
+    if (!assetMenu) return;
+    assetMenu.style.display = 'block';
+    const rect = assetMenu.getBoundingClientRect();
     const vw = window.innerWidth, vh = window.innerHeight;
     const posX = Math.min(x, vw - rect.width - 4);
     const posY = Math.min(y, vh - rect.height - 4);
-    this.assetMenu.style.left = posX + 'px';
-    this.assetMenu.style.top = posY + 'px';
+    assetMenu.style.left = posX + 'px';
+    assetMenu.style.top = posY + 'px';
   }
 
   private hideAssetContextMenu() {
-    if (this.assetMenu) this.assetMenu.style.display = 'none';
+    const assetMenu = document.getElementById('asset-context-menu');
+    if (assetMenu) assetMenu.style.display = 'none';
   }
 
   private onAssetMenuClick(e: Event) {
@@ -412,26 +455,22 @@ export class AssetManager {
   }
 
   // Folder context and operations
-  private ensureFolderMenuWired() {
-    if (!this.folderMenu) this.folderMenu = document.getElementById('asset-folder-context-menu');
-    if (this.folderMenu) {
-      document.addEventListener('click', () => this.hideFolderContextMenu());
-      this.folderMenu.addEventListener('click', (e) => this.onFolderMenuClick(e));
-    }
-  }
   private showFolderContextMenu(x: number, y: number, folderPath: string) {
-    this.ensureFolderMenuWired();
+    const folderMenu = document.getElementById('asset-folder-context-menu');
     this.folderMenuTargetPath = folderPath;
-    if (!this.folderMenu) return;
-    this.folderMenu.style.display = 'block';
-    const rect = this.folderMenu.getBoundingClientRect();
+    if (!folderMenu) return;
+    folderMenu.style.display = 'block';
+    const rect = folderMenu.getBoundingClientRect();
     const vw = window.innerWidth, vh = window.innerHeight;
     const posX = Math.min(x, vw - rect.width - 4);
     const posY = Math.min(y, vh - rect.height - 4);
-    this.folderMenu.style.left = posX + 'px';
-    this.folderMenu.style.top = posY + 'px';
+    folderMenu.style.left = posX + 'px';
+    folderMenu.style.top = posY + 'px';
   }
-  private hideFolderContextMenu() { if (this.folderMenu) this.folderMenu.style.display = 'none'; }
+  private hideFolderContextMenu() { 
+    const folderMenu = document.getElementById('asset-folder-context-menu');
+    if (folderMenu) folderMenu.style.display = 'none'; 
+  }
   private async onFolderMenuClick(e: Event) {
     const target = e.target as HTMLElement;
     const action = target?.getAttribute('data-action');

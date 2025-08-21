@@ -77,6 +77,10 @@ async function main() {
                 const fname = (name && name.trim() ? name.trim() : 'scene') + '.json';
                 await projectManager.writeFileIn('scenes', fname, new Blob([JSON.stringify(ast, null, 2)], { type: 'application/json' }));
                 debugLog.info(`Scene saved to project: scenes/${fname}`);
+                // Refresh scenes grid if we're currently viewing the scenes tab
+                if (scenesContent && getComputedStyle(scenesContent).display !== 'none') {
+                    await renderScenesGrid();
+                }
             } else {
                 const opts = {
                     suggestedName: 'scene.json',
